@@ -46,42 +46,92 @@ struct SpendingTrackerView: View {
 struct SpendingChart: View {
     let purchases: [Purchase]
     let incomes: [IncomeItem]
+    let monthsBack: Int = 6
 
     var body: some View {
+        let data = monthlyData
+        
         Chart {
-            ForEach(incomeSeries.indices, id: \.self) { i in
-                LineMark(x: .value("Month", i), y: .value("Income", incomeSeries[i]))
-                    .foregroundStyle(.green)
+            ForEach(data) {
+                point in LineMark(
+                    x: .value("Month", point.label),
+                    y: .value("Amount", point.income)
+                )
+                .foregroundStyle(by: .value("Type", "Impulse Spending"))
+                
             }
-            ForEach(spendSeries.indices, id: \.self) { i in
-                LineMark(x: .value("Month", i), y: .value("Unnecessary Spending", spendSeries[i]))
-                    .foregroundStyle(.red)
+        }
+        .chartYAxisLabel("$ per month")
+        .chartYScale(domain: 0...(maxY * 1.1))
+        .chartLegend(position: .bottom)
+    }
+    
+    private struct MonthlySummary: Identifiable {
+        let id = UUID()
+        let monthStart: Date
+        let label: String
+        let income: Double
+        let impulsiveSpend: Double
+    }
+    
+    private var monthlyData: [MonthlySummary] {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        let currentMonthStart = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: now)
+        ) ?? now
+        
+        var monthStarts: [Date] = []
+        for offset in stride(from: monthsBack - 1, through: 0, by: -1) {
+            if let date = calendar.date(byAdding: .month, value: -offset, to: currentMonthStart)
+            {
+                monthStarts.append(date)
             }
         }
-        .chartYAxisLabel("$ Amount")
-    }
-
-    // Simple cumulative series month-by-month for demo
-    var spendSeries: [Double] {
-        let sorted = purchases.sorted { $0.date < $1.date }
-        var cum: Double = 0
-        var buckets: [Double] = Array(repeating: 0, count: 12)
-        let calendar = Calendar.current
-        for p in sorted where p.type == .unnecessaryImpulse {
-            let m = calendar.component(.month, from: p.date) - 1
-            buckets[m] += p.amount
+        
+        let formatter = monthFormatter
+        var results: [MonthlySummary] = []
+        
+        for monthStart in monthStarts {
+            guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+                continue
+            }
+            
+            let impulsiveSpend = purchases
+                .filter { $0.type == .unnecessaryImpulse && $0.date >= monthStart && $0.date < monthEnd}
+                .map {$0.amount}
+                .reduce(0, +)
+            
+            let incomeTotal = incomes
+                .filter {$0.startDate < monthEnd}
+                .map { $0.amount}
+                .reduce(0, +)
+            
+            let label = formatter.string(from: monthStart)
+            
+            results.append(
+                MonthlySummary(
+                    monthStart: monthStart,
+                    label: label,
+                    income: incomeTotal,
+                    impulsiveSpend: impulsiveSpend
+                )
+            )
         }
-        return buckets.map { cum += $0; return cum }
+        
+        return results
     }
-
-    var incomeSeries: [Double] {
-        var cum: Double = 0
-        var buckets: [Double] = Array(repeating: 0, count: 12)
-        let calendar = Calendar.current
-        for inc in incomes {
-            let m = calendar.component(.month, from: inc.startDate) - 1
-            if m >= 0 && m < 12 { buckets[m] += inc.amount }
-        }
-        return buckets.map { cum += $0; return cum }
+    
+    private var maxY: Double {
+        monthlyData
+            .map { max($0.income, $0.impulsiveSpend) }
+            .max() ?? 1
+    }
+    
+    private var monthFormatter: DateFormatter {
+        let df = DateFormatter()
+        df.dateFormat = "MMM"
+        return df
     }
 }
