@@ -48,6 +48,14 @@ struct LessonModule: Identifiable, Codable {
     var progress: Double // 0...1
 }
 
+struct QuizQuestion: Identifiable, Codable {
+    var id = UUID()
+    var prompt: String
+    var choices: [String]
+    var answerIndex: Int
+    var explanation: String
+}
+
 struct UserProfile: Codable {
     var isImmigrantFamily: Bool?
     var experienceLevel: Int? // 1..4

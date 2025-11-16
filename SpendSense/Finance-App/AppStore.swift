@@ -22,10 +22,16 @@ final class AppStore: ObservableObject {
     }
 
     func seed() {
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: Date())
+        func monthDate(_ month: Int) -> Date {
+            calendar.date(from: DateComponents(year: year, month: month, day: 1)) ?? Date()
+        }
+        
         incomes = [
-            IncomeItem(amount: 3200, startDate: Date().addingTimeInterval(-120*86400)),
-            IncomeItem(amount: 3400, startDate: Date().addingTimeInterval(-60*86400)),
-            IncomeItem(amount: 3600, startDate: Date().addingTimeInterval(-30*86400))
+            IncomeItem(amount: 3200, startDate: monthDate(6)),
+            IncomeItem(amount: 3400, startDate: monthDate(7)),
+            IncomeItem(amount: 3600, startDate: monthDate(8))
         ]
         purchases = [
             Purchase(date: Date().addingTimeInterval(-50*86400), amount: 950, type: .newMonthlyCharge, platform: "Car Loan", note: "Monthly payment", impulsive: false),

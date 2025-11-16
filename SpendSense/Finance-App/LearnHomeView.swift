@@ -3,6 +3,9 @@ import SwiftUI
 struct LearnHomeView: View {
     @EnvironmentObject var store: AppStore
     @State private var showOnboarding = false
+    @State private var showQuickQuiz = false
+    @State private var quickQuizTitle = ""
+    @State private var quickQuizQuestions: [QuizQuestion] = []
 
     var body: some View {
         NavigationStack {
@@ -20,9 +23,25 @@ struct LearnHomeView: View {
                         }
                     }
                 }
+                
+                Section("Practice quizzes") {
+                    ForEach(store.lessons) { lesson in
+                        Button {
+                            quickQuizTitle = lesson.title
+                            quickQuizQuestions = QuizContent.moduleQuestions(for: lesson.title)
+                            showQuickQuiz = true
+                        } label: {
+                            Label("Quiz: \(lesson.title)", systemImage: "questionmark.circle")
+                        }
+                        .disabled(QuizContent.moduleQuestions(for: lesson.title).isEmpty)
+                    }
+                }
             }
             .navigationTitle("Learn")
             .sheet(isPresented: $showOnboarding) { OnboardingQuiz() }
+            .sheet(isPresented: $showQuickQuiz) {
+                MiniQuizView(title: quickQuizTitle, questions: quickQuizQuestions)
+            }
         }
     }
 }
@@ -32,6 +51,8 @@ struct OnboardingQuiz: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isImmigrant: Bool = false
     @State private var experience: Double = 1
+    @State private var showTailoredQuiz = false
+    @State private var tailoredQuestions: [QuizQuestion] = []
 
     var body: some View {
         NavigationStack {
@@ -42,21 +63,39 @@ struct OnboardingQuiz: View {
                     Slider(value: $experience, in: 1...4, step: 1)
                     Text("Level: \(Int(experience))").font(.caption)
                 }
+                
+                Section("Personalized quiz deck") {
+                    Text("Build a quiz based on your selections to lock in the most relevant concepts.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Button("Start personalized quiz") {
+                        persistProfile()
+                        tailoredQuestions = QuizContent.personalizedDeck(isImmigrant: isImmigrant, level: Int(experience))
+                        showTailoredQuiz = true
+                    }
+                }
             }
             .navigationTitle("Onboarding Quiz")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        store.profile.isImmigrantFamily = isImmigrant
-                        store.profile.experienceLevel = Int(experience)
-                        tailorModules()
-                        store.save()
+                        persistProfile()
                         dismiss()
                     }
                 }
             }
+            .sheet(isPresented: $showTailoredQuiz) {
+                MiniQuizView(title: "Personalized Plan", questions: tailoredQuestions)
+            }
         }
+    }
+    
+    private func persistProfile() {
+        store.profile.isImmigrantFamily = isImmigrant
+        store.profile.experienceLevel = Int(experience)
+        tailorModules()
+        store.save()
     }
 
     func tailorModules() {
@@ -73,11 +112,18 @@ struct OnboardingQuiz: View {
 struct LessonDetailView: View {
     @EnvironmentObject var store: AppStore
     @State var module: LessonModule
+    @State private var showQuiz = false
+    @State private var activeQuiz: [QuizQuestion] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(module.description)
-            Text("Mini-Game / Challenge placeholder").font(.footnote).foregroundStyle(.secondary)
+            Button("Take mini-quiz") {
+                activeQuiz = QuizContent.moduleQuestions(for: module.title)
+                showQuiz = true
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(QuizContent.moduleQuestions(for: module.title).isEmpty)
             ProgressView(value: module.progress)
             Button("Mark step complete") {
                 if let idx = store.lessons.firstIndex(where: { $0.id == module.id }) {
@@ -92,5 +138,8 @@ struct LessonDetailView: View {
         }
         .padding()
         .navigationTitle(module.title)
+        .sheet(isPresented: $showQuiz) {
+            MiniQuizView(title: module.title, questions: activeQuiz)
+        }
     }
 }
