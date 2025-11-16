@@ -59,4 +59,5 @@ struct QuizQuestion: Identifiable, Codable {
 struct UserProfile: Codable {
     var isImmigrantFamily: Bool?
     var experienceLevel: Int? // 1..4
+    var hasPersonalizedPlan: Bool?
 }
