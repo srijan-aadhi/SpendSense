@@ -23,12 +23,16 @@ final class AppStore: ObservableObject {
 
     func seed() {
         incomes = [
-            IncomeItem(amount: 1000, startDate: Date().addingTimeInterval(-120*86400)),
-            IncomeItem(amount: 1200, startDate: Date().addingTimeInterval(-30*86400))
+            IncomeItem(amount: 3200, startDate: Date().addingTimeInterval(-120*86400)),
+            IncomeItem(amount: 3400, startDate: Date().addingTimeInterval(-60*86400)),
+            IncomeItem(amount: 3600, startDate: Date().addingTimeInterval(-30*86400))
         ]
         purchases = [
-            Purchase(date: Date().addingTimeInterval(-20*86400), amount: 49.99, type: .unnecessaryImpulse, platform: "Instagram", note: "LED lights ad", impulsive: true),
-            Purchase(date: Date().addingTimeInterval(-10*86400), amount: 12.50, type: .necessary, platform: nil, note: "Groceries", impulsive: false)
+            Purchase(date: Date().addingTimeInterval(-50*86400), amount: 950, type: .newMonthlyCharge, platform: "Car Loan", note: "Monthly payment", impulsive: false),
+            Purchase(date: Date().addingTimeInterval(-35*86400), amount: 420, type: .necessary, platform: "Groceries", note: "Household restock", impulsive: false),
+            Purchase(date: Date().addingTimeInterval(-22*86400), amount: 175, type: .misc, platform: "Amazon", note: "Household items", impulsive: false),
+            Purchase(date: Date().addingTimeInterval(-15*86400), amount: 780, type: .unnecessaryImpulse, platform: "Instagram", note: "Limited drop sneakers", impulsive: true),
+            Purchase(date: Date().addingTimeInterval(-5*86400), amount: 260, type: .unnecessaryImpulse, platform: "TikTok", note: "Gadget ad", impulsive: true)
         ]
         portfolios = [
             Portfolio(name: "Roth IRA", kind: .rothIRA, monthlyContribution: 100, expectedAnnualReturn: 0.07, startYear: 2019),

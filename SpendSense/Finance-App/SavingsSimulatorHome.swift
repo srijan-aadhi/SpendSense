@@ -52,9 +52,27 @@ struct PortfolioDetail: View {
                 Stepper("Time Horizon: \(Int(years)) years", value: $years, in: 1...40)
             }
             Section("Settings") {
-                TextField("Monthly Contribution", value: $portfolio.monthlyContribution, format: .number)
-                TextField("Annual Return (e.g. 0.07)", value: $portfolio.expectedAnnualReturn, format: .number)
-                TextField("Name", text: $portfolio.name)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Monthly Contribution")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    TextField("Monthly Contribution", value: $portfolio.monthlyContribution, format: .number)
+                        .padding(.top, 2)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Annual Rate of Return")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    TextField("Annual Return (e.g. 0.07)", value: $portfolio.expectedAnnualReturn, format: .number)
+                        .padding(.top, 2)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Name of Savings")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    TextField("Name", text: $portfolio.name)
+                        .padding(.top, 2)
+                }
             }
             Section {
                 Button("Save Changes") {
@@ -88,6 +106,8 @@ struct ProjectionChart: View {
                 LineMark(x: .value("Month", i), y: .value("Value", values[i]))
             }
         }
+        .chartXAxisLabel("Months")
+        .chartYAxisLabel("Projected Balance ($)")
     }
 }
 

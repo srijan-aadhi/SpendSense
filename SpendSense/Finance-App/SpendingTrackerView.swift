@@ -9,7 +9,7 @@ struct SpendingTrackerView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                SpendingChart(purchases: store.purchases, incomes: store.incomes)
+                SpendingChart(purchases: store.purchases)
                     .frame(height: 240)
                     .padding(.horizontal)
 
@@ -45,24 +45,36 @@ struct SpendingTrackerView: View {
 
 struct SpendingChart: View {
     let purchases: [Purchase]
-    let incomes: [IncomeItem]
     let monthsBack: Int = 6
 
     var body: some View {
         let data = monthlyData
         
         Chart {
-            ForEach(data) {
-                point in LineMark(
+            ForEach(data) { point in
+                LineMark(
                     x: .value("Month", point.label),
-                    y: .value("Amount", point.income)
+                    y: .value("Amount", point.totalSpend)
                 )
-                .foregroundStyle(by: .value("Type", "Impulse Spending"))
-                
+                .symbol(.circle)
+                .foregroundStyle(by: .value("Series", "Total Spending"))
+            }
+            
+            ForEach(data) { point in
+                LineMark(
+                    x: .value("Month", point.label),
+                    y: .value("Amount", point.impulsiveSpend)
+                )
+                .symbol(.circle)
+                .foregroundStyle(by: .value("Series", "Unnecessary Impulse"))
             }
         }
         .chartYAxisLabel("$ per month")
         .chartYScale(domain: 0...(maxY * 1.1))
+        .chartForegroundStyleScale([
+            "Total Spending": Color.accentColor,
+            "Unnecessary Impulse": Color.red
+        ])
         .chartLegend(position: .bottom)
     }
     
@@ -70,7 +82,7 @@ struct SpendingChart: View {
         let id = UUID()
         let monthStart: Date
         let label: String
-        let income: Double
+        let totalSpend: Double
         let impulsiveSpend: Double
     }
     
@@ -98,14 +110,14 @@ struct SpendingChart: View {
                 continue
             }
             
-            let impulsiveSpend = purchases
-                .filter { $0.type == .unnecessaryImpulse && $0.date >= monthStart && $0.date < monthEnd}
-                .map {$0.amount}
+            let monthPurchases = purchases
+                .filter { $0.date >= monthStart && $0.date < monthEnd }
+            let impulsiveSpend = monthPurchases
+                .filter { $0.type == .unnecessaryImpulse }
+                .map { $0.amount }
                 .reduce(0, +)
-            
-            let incomeTotal = incomes
-                .filter {$0.startDate < monthEnd}
-                .map { $0.amount}
+            let totalSpend = monthPurchases
+                .map { $0.amount }
                 .reduce(0, +)
             
             let label = formatter.string(from: monthStart)
@@ -114,7 +126,7 @@ struct SpendingChart: View {
                 MonthlySummary(
                     monthStart: monthStart,
                     label: label,
-                    income: incomeTotal,
+                    totalSpend: totalSpend,
                     impulsiveSpend: impulsiveSpend
                 )
             )
@@ -125,7 +137,7 @@ struct SpendingChart: View {
     
     private var maxY: Double {
         monthlyData
-            .map { max($0.income, $0.impulsiveSpend) }
+            .map { max($0.totalSpend, $0.impulsiveSpend) }
             .max() ?? 1
     }
     
