@@ -13,8 +13,8 @@ struct SpendingTrackerView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
+            ScrollView(.vertical, showsIndicators: true) {
+                LazyVStack(spacing: 20) {
                     // Chart section
                     VStack(spacing: 12) {
                         SpendingChart(purchases: store.purchases, incomes: store.incomes)
@@ -73,13 +73,29 @@ struct SpendingTrackerView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal)
-                            
-                            ForEach(store.purchases.sorted(by: { $0.date > $1.date }).prefix(10)) { purchase in
-                                PurchaseRowView(purchase: purchase) {
-                                    purchaseToEdit = purchase
-                                } onDelete: {
-                                    deletePurchase(purchase)
+
+                            ForEach(purchasesByMonth) { section in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text(section.label)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                        Spacer()
+                                        Text("\(section.purchases.count) purchases")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.horizontal)
+
+                                    ForEach(section.purchases) { purchase in
+                                        PurchaseRowView(purchase: purchase) {
+                                            purchaseToEdit = purchase
+                                        } onDelete: {
+                                            deletePurchase(purchase)
+                                        }
+                                    }
                                 }
+                                .padding(.top, 8)
                             }
                         }
                         .padding(.top, 8)
@@ -176,6 +192,40 @@ struct SpendingTrackerView: View {
             impactFeedback.impactOccurred()
             
             showUndoAlert = true
+        }
+    }
+
+    private struct PurchaseMonthSection: Identifiable {
+        let id = UUID()
+        let label: String
+        let purchases: [Purchase]
+    }
+
+    private var purchasesByMonth: [PurchaseMonthSection] {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+
+        // Sort purchases newest first
+        let sorted = store.purchases.sorted { $0.date > $1.date }
+
+        // Group by month start date
+        let grouped = Dictionary(grouping: sorted) { purchase -> Date in
+            calendar.date(from: calendar.dateComponents([.year, .month], from: purchase.date)) ?? purchase.date
+        }
+
+        // Map to sections and sort sections by most recent month first
+        let sections: [PurchaseMonthSection] = grouped.map { (monthStart, purchases) in
+            let label = formatter.string(from: monthStart)
+            let monthPurchases = purchases.sorted { $0.date > $1.date }
+            return PurchaseMonthSection(label: label, purchases: monthPurchases)
+        }
+
+        return sections.sorted { first, second in
+            // Use the first purchase date in each section to sort, newest month first
+            let firstDate = first.purchases.first?.date ?? .distantPast
+            let secondDate = second.purchases.first?.date ?? .distantPast
+            return firstDate > secondDate
         }
     }
 
