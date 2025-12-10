@@ -5,30 +5,177 @@ struct SpendingTrackerView: View {
     @EnvironmentObject var store: AppStore
     @State private var showLogPurchase = false
     @State private var showModifyIncome = false
+    @State private var purchaseToEdit: Purchase?
+    @State private var showUndoAlert = false
+    @State private var lastDeletedPurchase: Purchase?
+    @State private var lastDeletedIndex: Int?
+    @State private var showHelp = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                SpendingChart(purchases: store.purchases, incomes: store.incomes)
-                    .frame(height: 240)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Chart section
+                    VStack(spacing: 12) {
+                        SpendingChart(purchases: store.purchases, incomes: store.incomes)
+                            .frame(height: 240)
+                        
+                        // Summary card with better visual hierarchy
+                        VStack(spacing: 8) {
+                            Text("Current Debt:Income Ratio")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("\(debtToIncomeRatio, specifier: "%.2f")")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(debtToIncomeRatio > 0.3 ? .red : .green)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
                     .padding(.horizontal)
 
-                Text("Current Debt:Income Ratio: \(debtToIncomeRatio, specifier: "%.2f")")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                HStack {
-                    Button("Log a new purchase") { showLogPurchase = true }
+                    // Action buttons
+                    HStack(spacing: 12) {
+                        Button {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            showLogPurchase = true
+                        } label: {
+                            Label("Log Purchase", systemImage: "plus.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
                         .buttonStyle(.borderedProminent)
-                    Button("Modify monthly income") { showModifyIncome = true }
+                        
+                        Button {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            showModifyIncome = true
+                        } label: {
+                            Label("Income", systemImage: "dollarsign.circle")
+                                .frame(maxWidth: .infinity)
+                        }
                         .buttonStyle(.bordered)
+                    }
+                    .padding(.horizontal)
+
+                    // Recent purchases list
+                    if !store.purchases.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Recent Purchases")
+                                    .font(.headline)
+                                Spacer()
+                                Text("\(store.purchases.count) total")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal)
+                            
+                            ForEach(store.purchases.sorted(by: { $0.date > $1.date }).prefix(10)) { purchase in
+                                PurchaseRowView(purchase: purchase) {
+                                    purchaseToEdit = purchase
+                                } onDelete: {
+                                    deletePurchase(purchase)
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "cart.badge.plus")
+                                .font(.system(size: 48))
+                                .foregroundStyle(.secondary)
+                            Text("No purchases yet")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                            Text("Tap 'Log Purchase' to get started")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 40)
+                    }
                 }
-                .padding(.horizontal)
-                Spacer()
+                .padding(.vertical)
             }
-            .navigationTitle("2025 Spending Tracker")
-            .sheet(isPresented: $showLogPurchase) { LogPurchaseView() }
-            .sheet(isPresented: $showModifyIncome) { ModifyIncomeView() }
+            .navigationTitle("Spending Tracker")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showHelp = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                }
+            }
+            .sheet(isPresented: $showHelp) {
+                HelpView(
+                    title: "Spending Tracker",
+                    content: """
+                    Track your spending to understand your financial habits.
+                    
+                    **How to use:**
+                    • Log purchases to track where your money goes
+                    • View your spending patterns in the chart
+                    • Monitor your debt-to-income ratio
+                    
+                    **Debt-to-Income Ratio:**
+                    This shows the ratio of unnecessary impulse spending to your monthly income. A lower ratio (under 0.3) is generally healthier.
+                    
+                    **Purchase Types:**
+                    • Unnecessary Impulse: Non-essential purchases you didn't plan
+                    • New Monthly Charge: Recurring expenses (subscriptions, loans)
+                    • Necessary: Essential items like food and clothing
+                    • Miscellaneous: Other expenses
+                    
+                    **Tips:**
+                    • Review your purchases regularly to identify spending patterns
+                    • Edit or delete purchases if you make a mistake
+                    • Keep your debt-to-income ratio low for better financial health
+                    """
+                )
+            }
+            .sheet(isPresented: $showLogPurchase) { 
+                LogPurchaseView()
+            }
+            .sheet(isPresented: $showModifyIncome) { 
+                ModifyIncomeView()
+            }
+            .sheet(item: $purchaseToEdit) { purchase in
+                EditPurchaseView(purchase: purchase)
+            }
+            .alert("Purchase Deleted", isPresented: $showUndoAlert) {
+                Button("Undo", role: .cancel) {
+                    if let purchase = lastDeletedPurchase, let index = lastDeletedIndex {
+                        store.purchases.insert(purchase, at: min(index, store.purchases.count))
+                        store.save()
+                        lastDeletedPurchase = nil
+                        lastDeletedIndex = nil
+                    }
+                }
+                Button("OK", role: .destructive) {
+                    lastDeletedPurchase = nil
+                    lastDeletedIndex = nil
+                }
+            } message: {
+                Text("Purchase deleted. You can undo this action.")
+            }
+        }
+    }
+    
+    private func deletePurchase(_ purchase: Purchase) {
+        if let index = store.purchases.firstIndex(where: { $0.id == purchase.id }) {
+            lastDeletedPurchase = purchase
+            lastDeletedIndex = index
+            store.purchases.remove(at: index)
+            store.save()
+            
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            
+            showUndoAlert = true
         }
     }
 
@@ -47,6 +194,7 @@ struct SpendingChart: View {
     let purchases: [Purchase]
     let incomes: [IncomeItem]
     let monthsBack: Int = 6
+    @State private var animateChart = false
 
     var body: some View {
         let data = monthlyData
@@ -59,6 +207,7 @@ struct SpendingChart: View {
                 )
                 .symbol(.circle)
                 .foregroundStyle(by: .value("Series", "Total Spending"))
+                .interpolationMethod(.catmullRom)
             }
             
             ForEach(data) { point in
@@ -68,6 +217,7 @@ struct SpendingChart: View {
                 )
                 .symbol(.circle)
                 .foregroundStyle(by: .value("Series", "Unnecessary Impulse"))
+                .interpolationMethod(.catmullRom)
             }
             
             ForEach(data) { point in
@@ -77,6 +227,7 @@ struct SpendingChart: View {
                 )
                 .symbol(.circle)
                 .foregroundStyle(by: .value("Series", "Income"))
+                .interpolationMethod(.catmullRom)
             }
         }
         .chartYAxisLabel("$ per month")
@@ -87,6 +238,29 @@ struct SpendingChart: View {
             "Income": Color.green
         ])
         .chartLegend(position: .bottom)
+        .opacity(animateChart ? 1.0 : 0.0)
+        .animation(.easeInOut(duration: 1.0), value: animateChart)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.0)) {
+                animateChart = true
+            }
+        }
+        .onChange(of: purchases.count) { oldValue, newValue in
+            animateChart = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    animateChart = true
+                }
+            }
+        }
+        .onChange(of: incomes.count) { oldValue, newValue in
+            animateChart = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    animateChart = true
+                }
+            }
+        }
     }
     
     private struct MonthlySummary: Identifiable {
