@@ -13,8 +13,8 @@ struct SpendingTrackerView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
+            ScrollView(.vertical, showsIndicators: true) {
+                LazyVStack(spacing: 20) {
                     // Chart section
                     VStack(spacing: 12) {
                         SpendingChart(purchases: store.purchases, incomes: store.incomes)

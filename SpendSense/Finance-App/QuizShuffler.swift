@@ -12,7 +12,7 @@ extension QuizQuestion {
         let correctAnswer = choices[answerIndex]
         
         // Shuffle the choices
-        var shuffledChoices = choices.shuffled()
+        let shuffledChoices = choices.shuffled()
         
         // Find the new index of the correct answer
         guard let newAnswerIndex = shuffledChoices.firstIndex(of: correctAnswer) else {
