@@ -1,5 +1,26 @@
 import SwiftUI
 
+struct PurchaseDraft: Identifiable {
+    let id = UUID()
+    let date: Date
+    let amount: Double
+    let type: PurchaseType
+    let platform: String?
+    let note: String?
+    let impulsive: Bool
+
+    func toPurchase() -> Purchase {
+        Purchase(
+            date: date,
+            amount: amount,
+            type: type,
+            platform: platform,
+            note: note,
+            impulsive: impulsive
+        )
+    }
+}
+
 struct LogPurchaseView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
@@ -9,6 +30,7 @@ struct LogPurchaseView: View {
     @State private var platform: String = ""
     @State private var note: String = ""
     @State private var showHelp = false
+    @State private var draftPurchase: PurchaseDraft?
 
     var body: some View {
         NavigationStack {
@@ -48,8 +70,9 @@ struct LogPurchaseView: View {
                 }
                 Section {
                     Button {
-                        let val = Double(amount) ?? 0
-                        let p = Purchase(
+                        guard let val = Double(amount), val > 0 else { return }
+
+                        draftPurchase = PurchaseDraft(
                             date: date,
                             amount: val,
                             type: type,
@@ -57,14 +80,6 @@ struct LogPurchaseView: View {
                             note: note.isEmpty ? nil : note,
                             impulsive: type == .unnecessaryImpulse
                         )
-                        store.purchases.append(p)
-                        store.save()
-                        
-                        // Success feedback
-                        let notificationFeedback = UINotificationFeedbackGenerator()
-                        notificationFeedback.notificationOccurred(.success)
-                        
-                        dismiss()
                     } label: {
                         HStack {
                             Spacer()
@@ -112,6 +127,88 @@ struct LogPurchaseView: View {
                     Try logging purchases for a month. You might be surprised by how small purchases add up!
                     """
                 )
+            }
+            .sheet(item: $draftPurchase) { draft in
+                PurchaseConfirmationView(
+                    draft: draft,
+                    onEdit: {
+                        draftPurchase = nil
+                    },
+                    onConfirm: {
+                        let purchase = draft.toPurchase()
+                        store.purchases.append(purchase)
+                        store.save()
+
+                        let notificationFeedback = UINotificationFeedbackGenerator()
+                        notificationFeedback.notificationOccurred(.success)
+
+                        dismiss()
+                    }
+                )
+            }
+        }
+    }
+}
+
+struct PurchaseConfirmationView: View {
+    let draft: PurchaseDraft
+    let onEdit: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                List {
+                    Section(header: Text("Purchase Type")) {
+                        Text(draft.type.rawValue)
+                    }
+
+                    Section(header: Text("Amount")) {
+                        Text(draft.amount, format: .currency(code: "USD"))
+                    }
+
+                    Section(header: Text("Date")) {
+                        Text(draft.date, style: .date)
+                    }
+
+                    Section(header: Text("Where")) {
+                        Text(draft.platform ?? "—")
+                    }
+
+                    if let note = draft.note, !note.isEmpty {
+                        Section(header: Text("Note")) {
+                            Text(note)
+                        }
+                    }
+                }
+                .listStyle(.insetGrouped)
+
+                HStack {
+                    Button(role: .cancel) {
+                        onEdit()
+                    } label: {
+                        Text("Edit")
+                            .frame(maxWidth: .infinity)
+                    }
+
+                    Button {
+                        onConfirm()
+                    } label: {
+                        Text("Confirm & Save")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding([.horizontal, .bottom])
+            }
+            .navigationTitle("Review Purchase")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onEdit()
+                    }
+                }
             }
         }
     }
