@@ -12,6 +12,12 @@ struct LearnHomeView: View {
     @State private var showOnboarding = false
     @State private var practiceQuizPayload: QuizPayload?
     @State private var showPersonalizeAlert = false
+    
+    private let learningSuggestions: [String] = [
+        "Start with one module at a time and mark progress after each step.",
+        "Take the practice quiz right after reading to lock in concepts.",
+        "Do a quick weekly review—short, frequent sessions build confidence."
+    ]
 
     var body: some View {
         NavigationStack {
@@ -22,6 +28,7 @@ struct LearnHomeView: View {
                     if !store.lessons.isEmpty {
                         practiceQuizzesSection
                     }
+                    suggestionCard
                 }
                 .padding(.vertical)
             }
@@ -168,6 +175,16 @@ struct LearnHomeView: View {
             }
             .padding(.horizontal)
         }
+    }
+
+    private var suggestionCard: some View {
+        SuggestionCard(
+            title: "Learning Suggestions",
+            suggestions: learningSuggestions,
+            icon: "lightbulb.fill",
+            tint: .blue
+        )
+        .padding(.horizontal)
     }
     
     private func quizButton(for lesson: LessonModule) -> some View {
@@ -322,36 +339,55 @@ struct OnboardingQuiz: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isImmigrant: Bool = false
     @State private var experienceLevel: Int = 1
+    @State private var statusMessage: String?
+    @State private var statusType: StatusMessageView.StatusType?
+    @State private var isSaving = false
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                Toggle("Are you or your immediate family immigrants?", isOn: $isImmigrant)
-                } header: {
-                    Text("Background")
-                } footer: {
-                    Text("This helps us provide relevant information about U.S. tax and financial systems.")
+            VStack(spacing: 0) {
+                if let message = statusMessage, let type = statusType {
+                    StatusMessageView(
+                        message: message,
+                        type: type,
+                        isVisible: Binding(
+                            get: { statusMessage != nil },
+                            set: { if !$0 { statusMessage = nil; statusType = nil } }
+                        )
+                    )
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .background(Color(.systemBackground))
                 }
                 
-                Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Choose your experience level")
-                    Picker("Experience level", selection: $experienceLevel) {
-                        ForEach(1...4, id: \.self) { value in
-                            Text("Level \(value)")
-                                .tag(value)
-                        }
+                Form {
+                    Section {
+                        Toggle("Are you or your immediate family immigrants?", isOn: $isImmigrant)
+                    } header: {
+                        Text("Background")
+                    } footer: {
+                        Text("This helps us provide relevant information about U.S. tax and financial systems.")
                     }
-                    .pickerStyle(.segmented)
-                    Text(levelDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                } header: {
-                    Text("Experience Level")
-                } footer: {
-                    Text("Select the level that best matches your current knowledge of personal finance.")
+                    
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Choose your experience level")
+                            Picker("Experience level", selection: $experienceLevel) {
+                                ForEach(1...4, id: \.self) { value in
+                                    Text("Level \(value)")
+                                        .tag(value)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            Text(levelDescription)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } header: {
+                        Text("Experience Level")
+                    } footer: {
+                        Text("Select the level that best matches your current knowledge of personal finance.")
+                    }
                 }
             }
             .navigationTitle("Personalize my plan")
@@ -362,12 +398,48 @@ struct OnboardingQuiz: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        persistProfile()
-                        let notificationFeedback = UINotificationFeedbackGenerator()
-                        notificationFeedback.notificationOccurred(.success)
-                        dismiss()
+                        saveProfile()
                     }
+                    .disabled(isSaving)
                 }
+            }
+            .overlay {
+                if isSaving {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+                        Text("Saving profile...")
+                            .foregroundStyle(.white)
+                            .font(.headline)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+            }
+        }
+    }
+    
+    private func saveProfile() {
+        isSaving = true
+        statusMessage = "Saving profile..."
+        statusType = .loading
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            persistProfile()
+            
+            isSaving = false
+            statusMessage = "Profile personalized successfully!"
+            statusType = .success
+            
+            let notificationFeedback = UINotificationFeedbackGenerator()
+            notificationFeedback.notificationOccurred(.success)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                dismiss()
             }
         }
     }

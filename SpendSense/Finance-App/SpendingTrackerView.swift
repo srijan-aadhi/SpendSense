@@ -10,6 +10,14 @@ struct SpendingTrackerView: View {
     @State private var lastDeletedPurchase: Purchase?
     @State private var lastDeletedIndex: Int?
     @State private var showHelp = false
+    @State private var statusMessage: String?
+    @State private var statusType: StatusMessageView.StatusType?
+    
+    private let spendingSuggestions: [String] = [
+        "Cap impulse spending to a weekly limit you decide, then log it here.",
+        "Tag recurring charges and review monthly—cancel anything unused.",
+        "Try shifting one impulse purchase per week into savings instead."
+    ]
 
     var body: some View {
         NavigationStack {
@@ -113,6 +121,15 @@ struct SpendingTrackerView: View {
                         }
                         .padding(.vertical, 40)
                     }
+
+                    // Suggestions
+                    SuggestionCard(
+                        title: "Spending Suggestions",
+                        suggestions: spendingSuggestions,
+                        icon: "lightbulb.fill",
+                        tint: .orange
+                    )
+                    .padding(.horizontal)
                 }
                 .padding(.vertical)
             }
@@ -178,20 +195,29 @@ struct SpendingTrackerView: View {
             } message: {
                 Text("Purchase deleted. You can undo this action.")
             }
+            .statusMessage(message: $statusMessage, type: $statusType)
         }
     }
     
     private func deletePurchase(_ purchase: Purchase) {
-        if let index = store.purchases.firstIndex(where: { $0.id == purchase.id }) {
-            lastDeletedPurchase = purchase
-            lastDeletedIndex = index
-            store.purchases.remove(at: index)
-            store.save()
-            
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            showUndoAlert = true
+        statusMessage = "Deleting purchase..."
+        statusType = .loading
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if let index = store.purchases.firstIndex(where: { $0.id == purchase.id }) {
+                lastDeletedPurchase = purchase
+                lastDeletedIndex = index
+                store.purchases.remove(at: index)
+                store.save()
+                
+                statusMessage = "Purchase deleted"
+                statusType = .success
+                
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                
+                showUndoAlert = true
+            }
         }
     }
 

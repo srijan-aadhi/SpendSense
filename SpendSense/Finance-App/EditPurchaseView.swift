@@ -11,6 +11,9 @@ struct EditPurchaseView: View {
     @State private var platform: String
     @State private var note: String
     @State private var showDeleteConfirmation = false
+    @State private var statusMessage: String?
+    @State private var statusType: StatusMessageView.StatusType?
+    @State private var isProcessing = false
     
     init(purchase: Purchase) {
         self.purchase = purchase
@@ -72,40 +75,74 @@ struct EditPurchaseView: View {
             } message: {
                 Text("This action cannot be undone.")
             }
+            .statusMessage(message: $statusMessage, type: $statusType)
+            .overlay {
+                if isProcessing {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                }
+            }
         }
     }
     
     private func saveChanges() {
         guard let amountValue = Double(amount), amountValue > 0 else { return }
         
-        if let index = store.purchases.firstIndex(where: { $0.id == purchase.id }) {
-            var updatedPurchase = purchase
-            updatedPurchase.amount = amountValue
-            updatedPurchase.type = type
-            updatedPurchase.date = date
-            updatedPurchase.platform = platform.isEmpty ? nil : platform
-            updatedPurchase.note = note.isEmpty ? nil : note
-            updatedPurchase.impulsive = type == .unnecessaryImpulse
-            
-            store.purchases[index] = updatedPurchase
-            store.save()
-            
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            dismiss()
+        isProcessing = true
+        statusMessage = "Saving changes..."
+        statusType = .loading
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let index = store.purchases.firstIndex(where: { $0.id == purchase.id }) {
+                var updatedPurchase = purchase
+                updatedPurchase.amount = amountValue
+                updatedPurchase.type = type
+                updatedPurchase.date = date
+                updatedPurchase.platform = platform.isEmpty ? nil : platform
+                updatedPurchase.note = note.isEmpty ? nil : note
+                updatedPurchase.impulsive = type == .unnecessaryImpulse
+                
+                store.purchases[index] = updatedPurchase
+                store.save()
+                
+                isProcessing = false
+                statusMessage = "Purchase updated successfully!"
+                statusType = .success
+                
+                let notificationFeedback = UINotificationFeedbackGenerator()
+                notificationFeedback.notificationOccurred(.success)
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    dismiss()
+                }
+            }
         }
     }
     
     private func deletePurchase() {
-        if let index = store.purchases.firstIndex(where: { $0.id == purchase.id }) {
-            store.purchases.remove(at: index)
-            store.save()
-            
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            dismiss()
+        isProcessing = true
+        statusMessage = "Deleting purchase..."
+        statusType = .loading
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let index = store.purchases.firstIndex(where: { $0.id == purchase.id }) {
+                store.purchases.remove(at: index)
+                store.save()
+                
+                isProcessing = false
+                statusMessage = "Purchase deleted"
+                statusType = .success
+                
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    dismiss()
+                }
+            }
         }
     }
 }

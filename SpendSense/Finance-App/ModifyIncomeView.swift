@@ -9,6 +9,9 @@ struct ModifyIncomeView: View {
     @State private var showUndoAlert = false
     @State private var lastDeletedIncome: IncomeItem?
     @State private var lastDeletedIndex: Int?
+    @State private var statusMessage: String?
+    @State private var statusType: StatusMessageView.StatusType?
+    @State private var isProcessing = false
 
     var body: some View {
         NavigationStack {
@@ -19,18 +22,7 @@ struct ModifyIncomeView: View {
                     DatePicker("Month", selection: $incomeMonth, displayedComponents: [.date])
                         .datePickerStyle(.compact)
                     Button {
-                        let val = Double(newAmount) ?? 0
-                        guard val > 0 else { return }
-                        let startOfMonth = Calendar.current.date(
-                            from: Calendar.current.dateComponents([.year, .month], from: incomeMonth)
-                        ) ?? incomeMonth
-                        store.incomes.append(IncomeItem(amount: val, startDate: startOfMonth))
-                        newAmount = ""
-                        incomeMonth = Date()
-                        store.save()
-                        
-                        let notificationFeedback = UINotificationFeedbackGenerator()
-                        notificationFeedback.notificationOccurred(.success)
+                        addIncome()
                     } label: {
                         HStack {
                             Spacer()
@@ -113,20 +105,66 @@ struct ModifyIncomeView: View {
             } message: {
                 Text("Income entry deleted. You can undo this action.")
             }
+            .statusMessage(message: $statusMessage, type: $statusType)
+            .overlay {
+                if isProcessing {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                }
+            }
+        }
+    }
+    
+    private func addIncome() {
+        let val = Double(newAmount) ?? 0
+        guard val > 0 else { return }
+        
+        isProcessing = true
+        statusMessage = "Adding income..."
+        statusType = .loading
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let startOfMonth = Calendar.current.date(
+                from: Calendar.current.dateComponents([.year, .month], from: incomeMonth)
+            ) ?? incomeMonth
+            store.incomes.append(IncomeItem(amount: val, startDate: startOfMonth))
+            newAmount = ""
+            incomeMonth = Date()
+            store.save()
+            
+            isProcessing = false
+            statusMessage = "Income added successfully!"
+            statusType = .success
+            
+            let notificationFeedback = UINotificationFeedbackGenerator()
+            notificationFeedback.notificationOccurred(.success)
         }
     }
     
     private func deleteIncome(_ income: IncomeItem) {
-        if let index = store.incomes.firstIndex(where: { $0.id == income.id }) {
-            lastDeletedIncome = income
-            lastDeletedIndex = index
-            store.incomes.remove(at: index)
-            store.save()
-            
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            showUndoAlert = true
+        isProcessing = true
+        statusMessage = "Deleting income..."
+        statusType = .loading
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if let index = store.incomes.firstIndex(where: { $0.id == income.id }) {
+                lastDeletedIncome = income
+                lastDeletedIndex = index
+                store.incomes.remove(at: index)
+                store.save()
+                
+                isProcessing = false
+                statusMessage = "Income deleted"
+                statusType = .success
+                
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                
+                showUndoAlert = true
+            }
         }
     }
     

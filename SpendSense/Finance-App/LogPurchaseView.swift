@@ -31,6 +31,9 @@ struct LogPurchaseView: View {
     @State private var note: String = ""
     @State private var showHelp = false
     @State private var draftPurchase: PurchaseDraft?
+    @State private var statusMessage: String?
+    @State private var statusType: StatusMessageView.StatusType?
+    @State private var isSaving = false
 
     var body: some View {
         NavigationStack {
@@ -133,16 +136,50 @@ struct LogPurchaseView: View {
                         draftPurchase = nil
                     },
                     onConfirm: {
-                        let purchase = draft.toPurchase()
-                        store.purchases.append(purchase)
-                        store.save()
-
-                        let notificationFeedback = UINotificationFeedbackGenerator()
-                        notificationFeedback.notificationOccurred(.success)
-
-                        dismiss()
+                        savePurchase(draft: draft)
                     }
                 )
+            }
+            .statusMessage(message: $statusMessage, type: $statusType)
+            .overlay {
+                if isSaving {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+                        Text("Saving purchase...")
+                            .foregroundStyle(.white)
+                            .font(.headline)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+            }
+        }
+    }
+    
+    private func savePurchase(draft: PurchaseDraft) {
+        isSaving = true
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let purchase = draft.toPurchase()
+            store.purchases.append(purchase)
+            store.save()
+            
+            isSaving = false
+            draftPurchase = nil
+            
+            let notificationFeedback = UINotificationFeedbackGenerator()
+            notificationFeedback.notificationOccurred(.success)
+            
+            statusMessage = "Purchase saved successfully!"
+            statusType = .success
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                dismiss()
             }
         }
     }

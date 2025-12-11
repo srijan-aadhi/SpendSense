@@ -4,6 +4,12 @@ import Charts
 struct SavingsSimulatorHome: View {
     @EnvironmentObject var store: AppStore
     @State private var showAdd = false
+    
+    private let savingsSuggestions: [String] = [
+        "Automate a transfer on payday to keep savings momentum.",
+        "Name each portfolio after a goal to stay motivated.",
+        "Nudge contributions up slightly each month if cash flow allows."
+    ]
 
     var body: some View {
         NavigationStack {
@@ -113,6 +119,14 @@ struct SavingsSimulatorHome: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal)
                     }
+
+                    SuggestionCard(
+                        title: "Savings Suggestions",
+                        suggestions: savingsSuggestions,
+                        icon: "sparkles",
+                        tint: .green
+                    )
+                    .padding(.horizontal)
                 }
                 .padding(.vertical)
             }
@@ -209,75 +223,87 @@ struct PortfolioDetail: View {
     @Environment(\.dismiss) private var dismiss
     @State private var years: Double = 5
     @State private var showHelp = false
+    @State private var statusMessage: String?
+    @State private var statusType: StatusMessageView.StatusType?
+    @State private var isSaving = false
 
     var body: some View {
-        Form {
-            Section {
-                ProjectionChart(monthly: portfolio.monthlyContribution, annualRate: portfolio.expectedAnnualReturn, years: years)
-                    .frame(height: 220)
-                Stepper("Time Horizon: \(Int(years)) years", value: $years, in: 1...40)
-            } header: {
-                HStack {
-                    Text("Projection")
-                    Spacer()
-                    Button {
-                        showHelp = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.blue)
-                    }
-                }
-            } footer: {
-                Text("This projection shows how your savings could grow over time based on your monthly contributions and expected return rate.")
+        VStack(spacing: 0) {
+            if let message = statusMessage, let type = statusType {
+                StatusMessageView(
+                    message: message,
+                    type: type,
+                    isVisible: Binding(
+                        get: { statusMessage != nil },
+                        set: { if !$0 { statusMessage = nil; statusType = nil } }
+                    )
+                )
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .background(Color(.systemBackground))
             }
             
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Monthly Contribution")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    TextField("Amount per month", value: $portfolio.monthlyContribution, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
-                        .padding(.top, 2)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Annual Rate of Return")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    TextField("Rate (e.g. 0.07 for 7%)", value: $portfolio.expectedAnnualReturn, format: .number)
-                        .keyboardType(.decimalPad)
-                        .padding(.top, 2)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Portfolio Name")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    TextField("Name", text: $portfolio.name)
-                        .padding(.top, 2)
-                }
-            } header: {
-                Text("Settings")
-            }
-            
-            Section {
-                Button {
-                    if let idx = store.portfolios.firstIndex(where: { $0.id == portfolio.id }) {
-                        store.portfolios[idx] = portfolio
-                        store.save()
-                        
-                        let notificationFeedback = UINotificationFeedbackGenerator()
-                        notificationFeedback.notificationOccurred(.success)
-                        
-                        dismiss()
-                    }
-                } label: {
+            Form {
+                Section {
+                    ProjectionChart(monthly: portfolio.monthlyContribution, annualRate: portfolio.expectedAnnualReturn, years: years)
+                        .frame(height: 220)
+                    Stepper("Time Horizon: \(Int(years)) years", value: $years, in: 1...40)
+                } header: {
                     HStack {
+                        Text("Projection")
                         Spacer()
-                        Label("Save Changes", systemImage: "checkmark.circle.fill")
-                        Spacer()
+                        Button {
+                            showHelp = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.blue)
+                        }
                     }
+                } footer: {
+                    Text("This projection shows how your savings could grow over time based on your monthly contributions and expected return rate.")
                 }
-                .buttonStyle(.borderedProminent)
+                
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Monthly Contribution")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        TextField("Amount per month", value: $portfolio.monthlyContribution, format: .currency(code: "USD"))
+                            .keyboardType(.decimalPad)
+                            .padding(.top, 2)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Annual Rate of Return")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        TextField("Rate (e.g. 0.07 for 7%)", value: $portfolio.expectedAnnualReturn, format: .number)
+                            .keyboardType(.decimalPad)
+                            .padding(.top, 2)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Portfolio Name")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        TextField("Name", text: $portfolio.name)
+                            .padding(.top, 2)
+                    }
+                } header: {
+                    Text("Settings")
+                }
+                
+                Section {
+                    Button {
+                        savePortfolio()
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("Save Changes", systemImage: "checkmark.circle.fill")
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSaving)
+                }
             }
         }
         .navigationTitle(portfolio.name)
@@ -313,6 +339,47 @@ struct PortfolioDetail: View {
                 • Consult a financial advisor for personalized advice
                 """
             )
+        }
+        .overlay {
+            if isSaving {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    Text("Saving portfolio...")
+                        .foregroundStyle(.white)
+                        .font(.headline)
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        }
+    }
+    
+    private func savePortfolio() {
+        isSaving = true
+        statusMessage = "Saving portfolio..."
+        statusType = .loading
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let idx = store.portfolios.firstIndex(where: { $0.id == portfolio.id }) {
+                store.portfolios[idx] = portfolio
+                store.save()
+                
+                isSaving = false
+                statusMessage = "Portfolio saved successfully!"
+                statusType = .success
+                
+                let notificationFeedback = UINotificationFeedbackGenerator()
+                notificationFeedback.notificationOccurred(.success)
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    dismiss()
+                }
+            }
         }
     }
 }
@@ -382,6 +449,9 @@ struct AddPortfolioSheet: View {
     @State private var name: String = "Savings"
     @State private var monthly: Double = 50
     @State private var annual: Double = 0.02
+    @State private var statusMessage: String?
+    @State private var statusType: StatusMessageView.StatusType?
+    @State private var isAdding = false
 
     var body: some View {
         NavigationStack {
@@ -398,11 +468,58 @@ struct AddPortfolioSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        store.portfolios.append(Portfolio(name: name, kind: kind, monthlyContribution: monthly, expectedAnnualReturn: annual, startYear: Calendar.current.component(.year, from: Date())))
-                        store.save()
-                        dismiss()
+                        addPortfolio()
                     }
+                    .disabled(isAdding)
                 }
+            }
+        }
+        .statusMessage(message: $statusMessage, type: $statusType)
+        .overlay {
+            if isAdding {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    Text("Adding portfolio...")
+                        .foregroundStyle(.white)
+                        .font(.headline)
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        }
+    }
+
+    private func addPortfolio() {
+        isAdding = true
+        statusMessage = "Adding portfolio..."
+        statusType = .loading
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            store.portfolios.append(
+                Portfolio(
+                    name: name,
+                    kind: kind,
+                    monthlyContribution: monthly,
+                    expectedAnnualReturn: annual,
+                    startYear: Calendar.current.component(.year, from: Date())
+                )
+            )
+            store.save()
+
+            isAdding = false
+            statusMessage = "Portfolio added successfully!"
+            statusType = .success
+
+            let notificationFeedback = UINotificationFeedbackGenerator()
+            notificationFeedback.notificationOccurred(.success)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                dismiss()
             }
         }
     }
