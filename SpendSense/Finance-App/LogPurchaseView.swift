@@ -25,7 +25,7 @@ struct LogPurchaseView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var amount: String = ""
-    @State private var type: PurchaseType = .unnecessaryImpulse
+    @State private var isImpulse: Bool = false
     @State private var date: Date = Date()
     @State private var platform: String = ""
     @State private var note: String = ""
@@ -36,11 +36,7 @@ struct LogPurchaseView: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Type", selection: $type) {
-                        ForEach(PurchaseType.allCases) { t in
-                            Text(t.rawValue).tag(t)
-                        }
-                    }
+                    Toggle("Unnecessary impulse purchase", isOn: $isImpulse)
                 } header: {
                     HStack {
                         Text("Purchase Type")
@@ -53,7 +49,7 @@ struct LogPurchaseView: View {
                         }
                     }
                 } footer: {
-                    Text("Categorize your purchase to better understand your spending habits.")
+                    Text("Turn this on for purchases you made on a whim or didn't plan. Leave it off for regular or necessary spending.")
                 }
                 
                 Section {
@@ -72,13 +68,15 @@ struct LogPurchaseView: View {
                     Button {
                         guard let val = Double(amount), val > 0 else { return }
 
+                        let purchaseType: PurchaseType = isImpulse ? .unnecessaryImpulse : .necessary
+
                         draftPurchase = PurchaseDraft(
                             date: date,
                             amount: val,
-                            type: type,
+                            type: purchaseType,
                             platform: platform.isEmpty ? nil : platform,
                             note: note.isEmpty ? nil : note,
-                            impulsive: type == .unnecessaryImpulse
+                            impulsive: isImpulse
                         )
                     } label: {
                         HStack {
@@ -160,7 +158,7 @@ struct PurchaseConfirmationView: View {
             VStack(spacing: 16) {
                 List {
                     Section(header: Text("Purchase Type")) {
-                        Text(draft.type.rawValue)
+                        Text(draft.impulsive ? "Unnecessary impulse" : "Regular / necessary")
                     }
 
                     Section(header: Text("Amount")) {
