@@ -24,11 +24,11 @@ struct LearnHomeView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     personalizeCard
+                    suggestionCard
                     learningModulesSection
                     if !store.lessons.isEmpty {
                         practiceQuizzesSection
                     }
-                    suggestionCard
                 }
                 .padding(.vertical)
             }

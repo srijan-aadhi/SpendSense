@@ -45,6 +45,15 @@ struct SpendingTrackerView: View {
                     }
                     .padding(.horizontal)
 
+                    // Suggestions (upper-middle placement)
+                    SuggestionCard(
+                        title: "Spending Suggestions",
+                        suggestions: spendingSuggestions,
+                        icon: "lightbulb.fill",
+                        tint: .orange
+                    )
+                    .padding(.horizontal)
+
                     // Action buttons
                     HStack(spacing: 12) {
                         Button {
@@ -121,15 +130,6 @@ struct SpendingTrackerView: View {
                         }
                         .padding(.vertical, 40)
                     }
-
-                    // Suggestions
-                    SuggestionCard(
-                        title: "Spending Suggestions",
-                        suggestions: spendingSuggestions,
-                        icon: "lightbulb.fill",
-                        tint: .orange
-                    )
-                    .padding(.horizontal)
                 }
                 .padding(.vertical)
             }

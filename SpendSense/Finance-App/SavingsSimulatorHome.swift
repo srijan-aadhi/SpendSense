@@ -44,6 +44,15 @@ struct SavingsSimulatorHome: View {
                         }
                         .padding(.horizontal)
                     }
+
+                    // Suggestions (upper-middle placement)
+                    SuggestionCard(
+                        title: "Savings Suggestions",
+                        suggestions: savingsSuggestions,
+                        icon: "sparkles",
+                        tint: .green
+                    )
+                    .padding(.horizontal)
                     
                     // Portfolios section
                     VStack(alignment: .leading, spacing: 12) {
@@ -119,14 +128,6 @@ struct SavingsSimulatorHome: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal)
                     }
-
-                    SuggestionCard(
-                        title: "Savings Suggestions",
-                        suggestions: savingsSuggestions,
-                        icon: "sparkles",
-                        tint: .green
-                    )
-                    .padding(.horizontal)
                 }
                 .padding(.vertical)
             }
