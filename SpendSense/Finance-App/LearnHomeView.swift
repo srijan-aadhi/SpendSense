@@ -1,4 +1,11 @@
+
 import SwiftUI
+
+struct QuizPayload: Identifiable {
+    let id = UUID()
+    let title: String
+    let questions: [QuizQuestion]
+}
 
 struct LearnHomeView: View {
     @EnvironmentObject var store: AppStore
@@ -20,7 +27,7 @@ struct LearnHomeView: View {
             }
             .navigationTitle("Learn")
             .sheet(isPresented: $showOnboarding) { OnboardingQuiz() }
-            .sheet(item: $practiceQuizPayload) { payload in
+            .sheet(item: $practiceQuizPayload) { (payload: QuizPayload) in
                 MiniQuizView(title: payload.title, questions: payload.questions)
             }
             .alert("Personalize your plan", isPresented: $showPersonalizeAlert) {
@@ -398,7 +405,8 @@ struct LessonDetailView: View {
     @State var module: LessonModule
     @State private var quizPayload: QuizPayload?
     @State private var showPersonalizeAlert = false
-
+    @State private var monthlyIncomeInput: String = ""
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -425,7 +433,7 @@ struct LessonDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Overview")
                         .font(.headline)
-            Text(module.description)
+                    Text(module.description)
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -463,6 +471,11 @@ struct LessonDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 
+                // Rent affordability calculator for Budgeting for U.S. Rent
+                if module.title == "Budgeting for U.S. Rent" {
+                    rentAffordabilitySection
+                }
+                
                 // Key terms section
                 if let terms = keyTerms(for: module.title) {
                     VStack(alignment: .leading, spacing: 12) {
@@ -493,20 +506,20 @@ struct LessonDetailView: View {
                 // Action buttons
                 VStack(spacing: 12) {
                     Button {
-                guard let level = store.profile.experienceLevel else {
-                    showPersonalizeAlert = true
-                    return
-                }
-                guard store.profile.hasPersonalizedPlan == true else {
-                    showPersonalizeAlert = true
-                    return
-                }
-                let isImmigrant = store.profile.isImmigrantFamily ?? false
+                        guard let level = store.profile.experienceLevel else {
+                            showPersonalizeAlert = true
+                            return
+                        }
+                        guard store.profile.hasPersonalizedPlan == true else {
+                            showPersonalizeAlert = true
+                            return
+                        }
+                        let isImmigrant = store.profile.isImmigrantFamily ?? false
                         var quiz = QuizContent.personalizedModuleQuestions(for: module.title, isImmigrant: isImmigrant, level: level)
-                guard !quiz.isEmpty else {
-                    showPersonalizeAlert = true
-                    return
-                }
+                        guard !quiz.isEmpty else {
+                            showPersonalizeAlert = true
+                            return
+                        }
                         
                         // Shuffle the answer choices for each question
                         quiz = quiz.withShuffledChoices()
@@ -514,7 +527,7 @@ struct LessonDetailView: View {
                         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                         impactFeedback.impactOccurred()
                         
-                quizPayload = QuizPayload(title: module.title, questions: quiz)
+                        quizPayload = QuizPayload(title: module.title, questions: quiz)
                     } label: {
                         HStack {
                             Image(systemName: "questionmark.circle.fill")
@@ -523,17 +536,17 @@ struct LessonDetailView: View {
                             Image(systemName: "arrow.right")
                         }
                         .padding()
-            }
-            .buttonStyle(.borderedProminent)
+                    }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     
                     Button {
-                if let idx = store.lessons.firstIndex(where: { $0.id == module.id }) {
-                    var m = store.lessons[idx]
-                    m.progress = min(1.0, (m.progress + 0.25))
-                    store.lessons[idx] = m
-                    module = m
-                    store.save()
+                        if let idx = store.lessons.firstIndex(where: { $0.id == module.id }) {
+                            var m = store.lessons[idx]
+                            m.progress = min(1.0, (m.progress + 0.25))
+                            store.lessons[idx] = m
+                            module = m
+                            store.save()
                             
                             let notificationFeedback = UINotificationFeedbackGenerator()
                             notificationFeedback.notificationOccurred(.success)
@@ -615,10 +628,59 @@ struct LessonDetailView: View {
             return nil
         }
     }
-}
-
-struct QuizPayload: Identifiable {
-    let id = UUID()
-    let title: String
-    let questions: [QuizQuestion]
+    // Rent affordability calculator section
+    private var rentAffordabilitySection: some View {
+        let income = Double(monthlyIncomeInput) ?? 0
+        let suggestedRent = income * 0.30
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "house.fill")
+                    .foregroundStyle(.blue)
+                Text("What can I afford for rent?")
+                    .font(.headline)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Enter your monthly income to see what 30% looks like.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                
+                HStack {
+                    TextField("Your monthly income", text: $monthlyIncomeInput)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+            
+            if income > 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("30% of your income")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(suggestedRent, format: .currency(code: "USD"))
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Text("A common rule of thumb is to keep rent at or below this amount each month.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 4)
+            } else {
+                Text("For example, if you earn $3,000/month, 30% would be about $900.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+    }
+    
 }
