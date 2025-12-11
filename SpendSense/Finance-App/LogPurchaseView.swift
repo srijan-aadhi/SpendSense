@@ -158,7 +158,7 @@ struct PurchaseConfirmationView: View {
             VStack(spacing: 16) {
                 List {
                     Section(header: Text("Purchase Type")) {
-                        Text(draft.impulsive ? "Unnecessary impulse" : "Regular / necessary")
+                        Text(draft.impulsive ? "Unnecessary impulse" : "Regular/Necessary")
                     }
 
                     Section(header: Text("Amount")) {
