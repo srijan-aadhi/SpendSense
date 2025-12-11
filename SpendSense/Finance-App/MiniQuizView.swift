@@ -4,6 +4,17 @@ struct MiniQuizView: View {
     @Environment(\.dismiss) private var dismiss
     let title: String
     let questions: [QuizQuestion]
+    var onComplete: ((Int, Int) -> Void)? = nil
+    
+    init(
+        title: String,
+        questions: [QuizQuestion],
+        onComplete: ((Int, Int) -> Void)? = nil
+    ) {
+        self.title = title
+        self.questions = questions.map { MiniQuizView.shuffledQuestion($0) }
+        self.onComplete = onComplete
+    }
     
     @State private var index = 0
     @State private var selectedChoice: Int? = nil
@@ -164,10 +175,11 @@ struct MiniQuizView: View {
                             Spacer()
                             Image(systemName: "arrow.right")
                         }
-                        .padding()
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .controlSize(.regular)
                 }
                 .padding(.top, 8)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -234,6 +246,7 @@ struct MiniQuizView: View {
             Button {
                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                 impactFeedback.impactOccurred()
+                onComplete?(score, questions.count)
                 dismiss()
             } label: {
                 HStack {
@@ -288,6 +301,19 @@ struct MiniQuizView: View {
             return .green
         }
         return .clear
+    }
+    
+    private static func shuffledQuestion(_ question: QuizQuestion) -> QuizQuestion {
+        let paired = question.choices.enumerated().shuffled()
+        let newChoices = paired.map { $0.element }
+        let newAnswerIndex = paired.firstIndex(where: { $0.offset == question.answerIndex }) ?? 0
+        return QuizQuestion(
+            id: question.id,
+            prompt: question.prompt,
+            choices: newChoices,
+            answerIndex: newAnswerIndex,
+            explanation: question.explanation
+        )
     }
 }
 

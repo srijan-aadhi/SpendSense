@@ -338,10 +338,12 @@ struct OnboardingQuiz: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var isImmigrant: Bool = false
-    @State private var experienceLevel: Int = 1
+    @State private var skillLevel: Int?
+    @State private var skillQuizResult: (score: Int, total: Int)?
     @State private var statusMessage: String?
     @State private var statusType: StatusMessageView.StatusType?
     @State private var isSaving = false
+    @State private var showSkillQuiz = false
 
     var body: some View {
         NavigationStack {
@@ -370,23 +372,45 @@ struct OnboardingQuiz: View {
                     }
                     
                     Section {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Choose your experience level")
-                            Picker("Experience level", selection: $experienceLevel) {
-                                ForEach(1...4, id: \.self) { value in
-                                    Text("Level \(value)")
-                                        .tag(value)
-                                }
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Detected level")
+                                Spacer()
+                                Text(skillLevelLabel)
+                                    .foregroundStyle(.secondary)
                             }
-                            .pickerStyle(.segmented)
-                            Text(levelDescription)
+                            
+                            Button {
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                impactFeedback.impactOccurred()
+                                showSkillQuiz = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "bolt.fill")
+                                    Text("Take skill check")
+                                    Spacer()
+                                    Image(systemName: "arrow.right")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            
+                            if let resultText = skillQuizResultText {
+                                Text(resultText)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            
+                            Text(skillLevelDetail)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     } header: {
-                        Text("Experience Level")
+                        Text("Skill Check")
                     } footer: {
-                        Text("Select the level that best matches your current knowledge of personal finance.")
+                        Text("Your level is set automatically from the quiz. Retake anytime to update it.")
                     }
                 }
             }
@@ -420,16 +444,41 @@ struct OnboardingQuiz: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
             }
+            .sheet(isPresented: $showSkillQuiz) {
+                MiniQuizView(
+                    title: "Skill Check",
+                    questions: QuizContent.skillAssessmentQuestions(),
+                    onComplete: { score, total in
+                    let level = mapLevel(from: score, total: total)
+                    skillLevel = level
+                    skillQuizResult = (score, total)
+                    statusMessage = "Skill quiz complete! Level set to \(level)."
+                    statusType = .success
+                    }
+                )
+            }
+            .onAppear {
+                isImmigrant = store.profile.isImmigrantFamily ?? false
+                if skillLevel == nil {
+                    skillLevel = store.profile.experienceLevel
+                }
+            }
         }
     }
     
     private func saveProfile() {
+        guard let levelToSave = skillLevel ?? store.profile.experienceLevel else {
+            statusMessage = "Take the skill check to set your level before saving."
+            statusType = .error
+            return
+        }
+        
         isSaving = true
         statusMessage = "Saving profile..."
         statusType = .loading
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            persistProfile()
+            persistProfile(level: levelToSave)
             
             isSaving = false
             statusMessage = "Profile personalized successfully!"
@@ -444,8 +493,27 @@ struct OnboardingQuiz: View {
         }
     }
     
-    private var levelDescription: String {
-        switch experienceLevel {
+    private var skillLevelLabel: String {
+        if let level = skillLevel ?? store.profile.experienceLevel {
+            return "Level \(level)"
+        }
+        return "Not set"
+    }
+    
+    private var skillLevelDetail: String {
+        if let level = skillLevel ?? store.profile.experienceLevel {
+            return levelDescription(for: level)
+        }
+        return "Take the 6-question skill check to set your starting point."
+    }
+    
+    private var skillQuizResultText: String? {
+        guard let result = skillQuizResult, let level = skillLevel else { return nil }
+        return "Quiz score: \(result.score)/\(result.total). We set you to Level \(level)."
+    }
+    
+    private func levelDescription(for level: Int) -> String {
+        switch level {
         case 1: return "Level 1 • Just starting out"
         case 2: return "Level 2 • Building confidence"
         case 3: return "Level 3 • Comfortable with key ideas"
@@ -453,18 +521,29 @@ struct OnboardingQuiz: View {
         }
     }
     
-    private func persistProfile() {
+    private func mapLevel(from score: Int, total: Int) -> Int {
+        guard total > 0 else { return 1 }
+        let pct = Double(score) / Double(total)
+        switch pct {
+        case ..<0.25: return 1
+        case ..<0.5: return 2
+        case ..<0.75: return 3
+        default: return 4
+        }
+    }
+    
+    private func persistProfile(level: Int) {
         store.profile.isImmigrantFamily = isImmigrant
-        store.profile.experienceLevel = experienceLevel
+        store.profile.experienceLevel = level
         store.profile.hasPersonalizedPlan = true
-        tailorModules()
+        tailorModules(level: level)
         store.save()
     }
 
-    func tailorModules() {
+    func tailorModules(level: Int) {
         // Simple rule-based tailoring
         store.lessons.removeAll()
-        if store.profile.isImmigrantFamily == true || (store.profile.experienceLevel ?? 1) <= 2 {
+        if store.profile.isImmigrantFamily == true || level <= 2 {
             store.lessons.append(LessonModule(title: "Tax Basics", description: "Bullet points on policies and filing.", progress: 0))
             store.lessons.append(LessonModule(title: "Budgeting for U.S. Rent", description: "Rent by location, % income.", progress: 0))
         }

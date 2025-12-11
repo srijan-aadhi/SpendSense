@@ -1,6 +1,77 @@
 import Foundation
 
 enum QuizContent {
+    static func skillAssessmentQuestions() -> [QuizQuestion] {
+        [
+            QuizQuestion(
+                prompt: "Where is the best place to keep a 3-6 month emergency fund?",
+                choices: [
+                    "A high-yield savings account",
+                    "A single volatile stock",
+                    "Cryptocurrency only",
+                    "Cash at home without insurance"
+                ],
+                answerIndex: 0,
+                explanation: "Emergency funds belong in safe, liquid accounts like high-yield savings."
+            ),
+            QuizQuestion(
+                prompt: "If you only pay the minimum on a credit card, what happens?",
+                choices: [
+                    "Interest keeps accruing and payoff takes longer",
+                    "Your APR drops to 0%",
+                    "Your credit score instantly jumps 200 points",
+                    "The card automatically closes"
+                ],
+                answerIndex: 0,
+                explanation: "Minimum payments avoid late fees but interest continues, extending payoff time."
+            ),
+            QuizQuestion(
+                prompt: "What does diversification mean for investing?",
+                choices: [
+                    "Spreading money across different assets",
+                    "Putting everything into one hot stock",
+                    "Only keeping cash",
+                    "Waiting for perfect timing"
+                ],
+                answerIndex: 0,
+                explanation: "Diversification reduces risk by not relying on a single asset or sector."
+            ),
+            QuizQuestion(
+                prompt: "Which plan divides money into needs, wants, and savings/debt?",
+                choices: [
+                    "50/30/20 rule",
+                    "Zero money down",
+                    "Payday shuffle",
+                    "Margin trading"
+                ],
+                answerIndex: 0,
+                explanation: "The 50/30/20 rule assigns 50% to needs, 30% to wants, and 20% to savings or debt."
+            ),
+            QuizQuestion(
+                prompt: "What’s a simple way to avoid leaving free retirement money on the table?",
+                choices: [
+                    "Contribute enough to get your employer’s 401(k) match",
+                    "Skip retirement contributions until your 50s",
+                    "Only use a checking account",
+                    "Borrow from your 401(k) every year"
+                ],
+                answerIndex: 0,
+                explanation: "Employer matches are part of your compensation—contribute enough to capture the full match."
+            ),
+            QuizQuestion(
+                prompt: "Which investment best matches a long-term, low-cost approach?",
+                choices: [
+                    "A broad-market index fund",
+                    "Daily penny stock trades",
+                    "High-interest payday loans",
+                    "Keeping cash under a mattress"
+                ],
+                answerIndex: 0,
+                explanation: "Index funds offer diversified, low-cost exposure suitable for long-term growth."
+            )
+        ]
+    }
+    
     static func moduleQuestions(for title: String) -> [QuizQuestion] {
         switch title {
         case "Tax Basics":
